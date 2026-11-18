@@ -1,0 +1,628 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>The First Paycheck</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600&family=Space+Grotesk:wght@500;700&display=swap">
+<style>
+/* Layout: one narrow column, phone first. A ledger strip stays at the top, the current decision sits below it, the profile is a printed-slip card at the end. */
+:root{
+  --bg:#F2F5F3;
+  --surface:#FFFFFF;
+  --fg:#14201B;
+  --muted:#52625B;
+  --line:#D3DCD7;
+  --soft:#E3EEE8;
+  --accent:#0B6E4F;
+  --accent-ink:#FFFFFF;
+  --loss:#B4421C;
+  --luck:#8A5A00;
+  --font-display:"Space Grotesk","Helvetica Neue",Arial,sans-serif;
+  --font-body:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --font-mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0D1512;--surface:#151F1B;--fg:#E7F0EB;--muted:#9DB0A7;--line:#27352F;--soft:#1B2923;
+    --accent:#4CC38A;--accent-ink:#07120D;--loss:#F08A62;--luck:#E3B34F;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0D1512;--surface:#151F1B;--fg:#E7F0EB;--muted:#9DB0A7;--line:#27352F;--soft:#1B2923;
+  --accent:#4CC38A;--accent-ink:#07120D;--loss:#F08A62;--luck:#E3B34F;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{
+  background:var(--bg);color:var(--fg);
+  font-family:var(--font-body);font-size:16px;line-height:1.5;
+  padding-block:20px 40px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));
+}
+main{max-width:560px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+h1,h2,h3{font-family:var(--font-display);margin:0;text-wrap:balance;line-height:1.15}
+h1{font-size:2rem;font-weight:700;letter-spacing:-.01em}
+h2{font-size:1.4rem;font-weight:700}
+h3{font-size:1.05rem;font-weight:700}
+p{margin:0}
+.muted{color:var(--muted)}
+.label{font-size:.72rem;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.num{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+
+.ledger{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));background:var(--surface);border:1px solid var(--line);border-radius:10px}
+.ledger>div{padding:10px 12px;min-width:0}
+.ledger>div+div{border-left:1px solid var(--line)}
+.ledger .v{font-family:var(--font-mono);font-weight:600;font-size:1.05rem;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.v.neg{color:var(--loss)}
+.v.pos{color:var(--accent)}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px;display:flex;flex-direction:column;gap:14px}
+.steps{display:flex;gap:6px}
+.steps span{flex:1;height:4px;border-radius:2px;background:var(--line)}
+.steps span.on{background:var(--accent)}
+
+.opts{display:flex;flex-direction:column;gap:10px}
+.opt{
+  display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;
+  background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:10px;
+  padding:14px;font:inherit;cursor:pointer;min-height:56px;
+}
+.opt:hover{border-color:var(--accent)}
+.opt .k{font-family:var(--font-mono);font-weight:600;color:var(--accent);flex:none;width:1.2em}
+button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+
+.btn{
+  font:inherit;font-weight:600;background:var(--accent);color:var(--accent-ink);border:0;border-radius:10px;
+  padding:13px 18px;cursor:pointer;min-height:48px;
+}
+.btn.ghost{background:transparent;color:var(--fg);border:1px solid var(--line)}
+.btn-row{display:flex;gap:10px;flex-wrap:wrap}
+.linkish{background:none;border:0;color:var(--muted);font:inherit;text-decoration:underline;cursor:pointer;padding:6px 0;align-self:flex-start}
+
+.timer{display:flex;align-items:center;gap:10px}
+.timer .track{flex:1;height:8px;border-radius:4px;background:var(--line);overflow:hidden}
+.timer .bar{height:100%;width:100%;background:var(--loss)}
+.timer .t{font-family:var(--font-mono);font-weight:600;min-width:3ch;text-align:right}
+
+.dierow{display:flex;align-items:center;gap:14px}
+.die{
+  width:64px;height:64px;border-radius:12px;border:2px solid var(--fg);background:var(--surface);
+  display:grid;place-items:center;font-family:var(--font-mono);font-weight:600;font-size:1.9rem;flex:none;
+}
+.die.rolling{animation:wob .18s linear infinite}
+@keyframes wob{0%{transform:rotate(-6deg)}50%{transform:rotate(6deg)}100%{transform:rotate(-6deg)}}
+@media (prefers-reduced-motion: reduce){.die.rolling{animation:none}}
+.luckword{font-weight:600}
+.luckword.good{color:var(--accent)}
+.luckword.bad{color:var(--loss)}
+.luckword.mid{color:var(--luck)}
+
+.deltas{display:flex;flex-wrap:wrap;gap:8px}
+.chip{font-family:var(--font-mono);font-size:.85rem;font-weight:600;padding:4px 9px;border-radius:6px;background:var(--soft)}
+.chip.neg{color:var(--loss)}
+.chip.pos{color:var(--accent)}
+.tag{font-size:.85rem;color:var(--muted);border-top:1px solid var(--line);padding-top:12px}
+
+.slip{border:1px dashed var(--muted);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:12px;background:var(--surface)}
+.found{display:flex;flex-direction:column;gap:6px;padding:12px;border-radius:8px;background:var(--soft)}
+.found h3{font-size:1rem}
+.found .act{font-size:.92rem}
+
+.bars{display:flex;flex-direction:column;gap:10px}
+.bar-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;align-items:end}
+.bar-row .name{font-size:.92rem}
+.bar-row .ct{font-family:var(--font-mono);font-size:.85rem;color:var(--muted)}
+.bar-row .rail{grid-column:1/-1;height:10px;border-radius:5px;background:var(--line);overflow:hidden}
+.bar-row .fill{height:100%;background:var(--accent);border-radius:5px}
+.note{font-size:.85rem;color:var(--muted)}
+[hidden]{display:none!important}
+</style>
+
+<style>:root{color-scheme:light}body{margin:0}img{max-width:100%}</style>
+</head>
+<body>
+<main id="app" aria-live="polite"></main>
+
+<script>
+(function(){
+"use strict";
+
+var OB = {
+  fear:  {name:"Fear of losing money", take:1, act:"Put $20 to $25 into an asset you can name and track, such as an index fund, and watch the income it produces."},
+  habit: {name:"Bad habits", take:1, act:"Set an automatic transfer for payday, even $10, that moves before you can spend anything."},
+  cynic: {name:"Cynicism", take:2, act:"Pick one opportunity you dismissed and read its numbers before you decide again."},
+  arrog: {name:"Arrogance", take:2, act:"Ask one basic question of someone who knows, and read one real income statement start to finish."},
+  lazy:  {name:"Laziness (“too busy”)", take:3, act:"Block one hour a week for something you own. Make the first step as small as you like."}
+};
+var OB_KEYS = ["fear","habit","cynic","arrog","lazy"];
+var TAKE = {
+  1:"Make money work for you",
+  2:"Wealth is built beyond the classroom",
+  3:"Think like an owner, not an employee"
+};
+
+var ROUNDS = [
+  {
+    title:"Payday", take:1, secs:12,
+    setup:"Your first real paycheck just landed: $1,000. It is Friday and your phone is full of ideas.",
+    opts:[
+      {k:"A", text:"Upgrade your phone on a payment plan and add a few subscriptions. You earned it.", ob:"habit",
+       short:"took on a payment plan and new subscriptions", fx:{cash:-100,assets:0,flow:-70},
+       out:"The payments start right away. Cash flow drops by $70 a month, and nothing you bought will be worth more next year."},
+      {k:"B", text:"Leave all of it in checking, just in case.", ob:"fear",
+       short:"left all of it in checking", fx:{cash:0,assets:0,flow:0},
+       out:"Nothing is lost and nothing works for you. The money sits there."},
+      {k:"C", text:"Put $400 into a friend’s “can’t-lose” hustle. You don’t ask how it works, because you don’t want to look clueless.", ob:"arrog",
+       short:"put $400 into a friend’s hustle without asking how it works",
+       fx:{cash:-400,assets:400,flow:0}, sw:{assets:400},
+       out:{good:"The hustle took off and your stake doubled. Nothing about your process earned that.",
+            mid:"Nobody can say what your $400 is worth. There is no income and no statement to read.",
+            bad:"The hustle folded. The $400 is gone."}},
+      {k:"D", text:"Pay yourself first. Move $300 into an income-producing asset and budget the rest.", ob:null,
+       short:"paid yourself first", fx:{cash:-300,assets:300,flow:15}, sw:{flow:15},
+       out:{good:"Payouts came in high this month: $30 a month, arriving whether you work or not.",
+            mid:"$15 a month, arriving whether you work or not.",
+            bad:"A slow month: the asset paid nothing yet. You still own it."}}
+    ]
+  },
+  {
+    title:"The pitch", take:2, secs:10,
+    setup:"A classmate offers you 25% of their campus business for $300. They say it makes great money, and the offer ends today.",
+    opts:[
+      {k:"A", text:"Pass. People who pitch like this are always running a scheme.", ob:"cynic",
+       short:"passed without looking, because pitches like this are always schemes", fx:{cash:0,assets:0,flow:0},
+       out:"You keep your $300. You also never found out whether the business was real."},
+      {k:"B", text:"Pass. You can’t afford to lose $300.", ob:"fear",
+       short:"passed because $300 felt too risky to lose", fx:{cash:0,assets:0,flow:0},
+       out:"Your cash is safe. A small risk you could have checked first went by."},
+      {k:"C", text:"Invest on the spot. With your coursework you get it, and you don’t need to ask.", ob:"arrog",
+       short:"invested on the spot without seeing the books",
+       fx:{cash:-300,assets:300,flow:0}, sw:{assets:300},
+       out:{good:"It happened to work out. You still could not explain why to the class.",
+            mid:"You own a stake you cannot value, because you never saw the books.",
+            bad:"Revenue was half what they claimed. Your stake is worth nothing."}},
+      {k:"D", text:"Spend $25 to see the books and talk to two customers, then decide.", ob:null,
+       short:"checked the books before committing", fx:{cash:-225,assets:200,flow:20}, sw:{flow:10},
+       out:{good:"The books show about half the profit they claimed, so you negotiate the price down to $200. Sales had a good month: $30 a month.",
+            mid:"The books show about half the profit they claimed, so you negotiate the price down to $200. Your share pays $20 a month.",
+            bad:"The books show about half the profit they claimed, so you negotiate the price down to $200. A slow semester: $10 a month."}}
+    ]
+  },
+  {
+    title:"The advisor", take:2, secs:10,
+    setup:"At a campus career fair, a friendly advisor recommends a “safe investment for students” you could start with $150. The brochure is glossy and he says the offer ends today.",
+    opts:[
+      {k:"A", text:"Sign up. The brochure looks professional and he sounds like he knows his stuff.", ob:"arrog",
+       short:"signed up because the brochure looked professional", fx:{cash:-150,assets:60,flow:-20},
+       out:"The product charges heavy fees. Your $150 is already worth about $60, and $20 a month is going out."},
+      {k:"B", text:"Ignore him. Every advisor is a crook.", ob:"cynic",
+       short:"dismissed the advisor without asking a single question", fx:{cash:0,assets:0,flow:0},
+       out:"You keep your money. You also skip learning what a fair fee or a fair product looks like."},
+      {k:"C", text:"You don’t have time to look into this. Maybe later.", ob:"lazy",
+       short:"didn’t have time to look into it", fx:{cash:0,assets:0,flow:0},
+       out:"Nothing changes. “Later” has no date on it."},
+      {k:"D", text:"Ask how he gets paid, get the fees in writing, and compare them with a basic low-fee fund.", ob:null,
+       short:"asked how the advisor gets paid and compared the fees", fx:{cash:-100,assets:100,flow:5}, sw:{flow:5},
+       out:{good:"He earns a commission, and the fees are far higher than a basic fund’s. You put $100 in the basic fund instead. A good month: $10 a month.",
+            mid:"He earns a commission, and the fees are far higher than a basic fund’s. You put $100 in the basic fund instead: $5 a month.",
+            bad:"He earns a commission, and the fees are far higher than a basic fund’s. You put $100 in the basic fund instead. A flat month: nothing paid yet."}}
+    ]
+  },
+  {
+    title:"The side project", take:3, secs:25,
+    setup:"You have an idea for a small side business: tutoring, reselling thrifted clothes, or editing videos for clubs. Nobody is asking you to start.",
+    opts:[
+      {k:"A", text:"Someday. Right now you’re too busy.", ob:"lazy",
+       short:"put off starting anything because you were too busy", fx:{cash:0,assets:0,flow:0},
+       out:"Nothing changes. Next semester will be just as busy."},
+      {k:"B", text:"Don’t start. What if it fails and you waste the money?", ob:"fear",
+       short:"didn’t start because failing felt worse than not trying", fx:{cash:0,assets:0,flow:0},
+       out:"You can’t lose anything, and you can’t build anything."},
+      {k:"C", text:"Skip the planning. You’re smart enough to figure it out as you go.", ob:"arrog",
+       short:"started with no plan and no numbers",
+       fx:{cash:-150,assets:150,flow:0}, sw:{assets:150,flow:20},
+       out:{good:"A few customers found you on their own: $20 a month. You still can’t say why it worked.",
+            mid:"You spent $150 on supplies with no price list and no records. You can’t tell what earns money.",
+            bad:"Costs ran past what you charged. The supplies are wasted and you are down $20 a month."}},
+      {k:"D", text:"Start tiny. Spend $50, test with five customers, and write down what comes in and goes out.", ob:null,
+       short:"started small and tracked the numbers", fx:{cash:-50,assets:50,flow:15}, sw:{flow:10},
+       out:{good:"Five customers and a written record: $25 a month, and you know which part earns it.",
+            mid:"$15 a month, and you know which part earns it.",
+            bad:"A slow start: $5 a month. Your notes show exactly what to change."}}
+    ]
+  },
+  {
+    title:"The raise", take:1, secs:25,
+    setup:"A summer internship pays about $800 a month more than you have ever earned. You decide what changes.",
+    opts:[
+      {k:"A", text:"Upgrade: a nicer apartment and a car on a payment plan. You’ve earned it.", ob:"habit",
+       short:"let your spending grow as fast as your pay", fx:{cash:100,assets:0,flow:-90},
+       out:"Income went up and so did the bills. The new payments keep going after the internship ends."},
+      {k:"B", text:"Why bother saving? Taxes and rent will eat it anyway.", ob:"cynic",
+       short:"decided the raise would get eaten anyway and did nothing with it", fx:{cash:150,assets:0,flow:0},
+       out:"The extra money drifts into everyday spending. Nothing is set up to repeat."},
+      {k:"C", text:"Leave it in checking. You’ll think about it when things calm down.", ob:"lazy",
+       short:"left the extra income alone until things calm down", fx:{cash:300,assets:0,flow:0},
+       out:"The extra pay piles up in checking. Another month goes by with nothing working."},
+      {k:"D", text:"Keep your lifestyle the same. Put half the raise to work and read how it will be taxed.", ob:null,
+       short:"kept your lifestyle and put half the raise to work", fx:{cash:150,assets:150,flow:12}, sw:{flow:10},
+       out:{good:"You find taxes take a bigger bite than you expected, and plan for it. The asset pays $22 a month.",
+            mid:"You find taxes take a bigger bite than you expected, and plan for it. The asset pays $12 a month.",
+            bad:"You find taxes take a bigger bite than you expected, and plan for it. The asset pays $2 a month so far."}}
+    ]
+  },
+  {
+    title:"The busy week", take:3, secs:20,
+    setup:"Midterms hit. You have about three free hours this week, and you have 20 seconds to decide what they are for.",
+    opts:[
+      {k:"A", text:"Too busy. You’ll sort out money after midterms.", ob:"lazy",
+       short:"put money off until after midterms", fx:{cash:-30,assets:0,flow:0},
+       out:"A bill you did not have time to open charged a $30 late fee."},
+      {k:"B", text:"Pick up extra shifts, and spend the pay as it arrives.", ob:"habit",
+       short:"worked extra shifts and spent the pay as it came", fx:{cash:60,assets:0,flow:0},
+       out:"You earned $200, spent most of it, and kept $60. Your paycheck is still the only thing paying you."},
+      {k:"C", text:"It’s all rigged anyway. You stop investing and don’t look back.", ob:"cynic",
+       short:"decided investing is rigged and stopped", fx:{cash:0,assets:0,flow:0},
+       out:"Nothing changes and nothing builds."},
+      {k:"D", text:"Give one hour to something you own: check what your assets paid and read one statement.", ob:null,
+       short:"spent time on something you own", fx:{cash:0,assets:0,flow:10}, sw:{flow:10},
+       out:{good:"You catch a fee and cancel it: $20 a month back.",
+            mid:"You find one unused subscription and cancel it: $10 a month back.",
+            bad:"Nothing to fix this month, but you now know exactly where you stand."}}
+    ],
+    timeout:{k:"–", ob:"lazy", short:"let the clock run out",
+      fx:{cash:-30,assets:0,flow:0},
+      out:"The clock ran out and the decision slid to next week. That counts as putting it off, and a $30 late fee hit."}
+  }
+];
+
+var TIMEOUTS = [
+  {k:"–", ob:null, late:true, short:"let the clock run out", fx:{cash:0,assets:0,flow:0},
+   out:"You froze and the decision slid by. The $1,000 sits in checking, doing nothing yet."},
+  {k:"–", ob:null, late:true, short:"let the clock run out", fx:{cash:0,assets:0,flow:0},
+   out:"The offer expired while you were deciding. Nothing gained, nothing lost, and no information gathered."},
+  {k:"–", ob:null, late:true, short:"let the clock run out", fx:{cash:0,assets:0,flow:0},
+   out:"The advisor moved on to the next student. You never found out how he gets paid."},
+  {k:"–", ob:null, late:true, short:"let the clock run out", fx:{cash:0,assets:0,flow:0},
+   out:"The idea slid by while you were deciding. Nothing started."},
+  {k:"–", ob:null, late:true, short:"let the clock run out", fx:{cash:300,assets:0,flow:0},
+   out:"The raise arrives and sits in checking while you decide. Nothing is set up to work."},
+  {k:"–", ob:null, late:true, short:"let the clock run out", fx:{cash:-30,assets:0,flow:0},
+   out:"The clock ran out and the decision slid to next week. A $30 late fee hit."}
+];
+ROUNDS.forEach(function(R,i){ R.timeout = TIMEOUTS[i]; });
+
+var S, tmr = null, db = null, userNs = null, uid = null, classDocs = [], wrote = false, downloads = null;
+var app = document.getElementById("app");
+
+function resetState(){
+  S = {screen:"intro", i:0, cash:1000, assets:0, flow:0, picks:[]};
+}
+resetState();
+
+function $(sel, root){ return (root||document).querySelector(sel); }
+function money(n){ var s = Math.abs(Math.round(n)).toLocaleString("en-US"); return (n<0?"−$":"$")+s; }
+function signed(n){ return (n>0?"+":n<0?"−":"")+"$"+Math.abs(Math.round(n)).toLocaleString("en-US"); }
+function cls(n){ return n<0?" neg":n>0?" pos":""; }
+
+function ledgerHTML(){
+  return '<div class="ledger" id="led">'+
+    '<div><div class="label">Cash</div><div class="v'+cls(S.cash<0?-1:0)+'">'+money(S.cash)+'</div></div>'+
+    '<div><div class="label">Assets</div><div class="v">'+money(S.assets)+'</div></div>'+
+    '<div><div class="label">Cash flow</div><div class="v'+cls(S.flow)+'">'+signed(S.flow)+'/mo</div></div>'+
+    '</div>';
+}
+function stepsHTML(n){
+  var h = '<div class="steps" aria-hidden="true">';
+  for(var j=0;j<ROUNDS.length;j++) h += '<span class="'+(j<n?"on":"")+'"></span>';
+  return h+'</div>';
+}
+
+/* ---------- screens ---------- */
+function showIntro(){
+  S.screen="intro";
+  app.innerHTML =
+    '<div class="card">'+
+      '<p class="label">Rich Dad Poor Dad</p>'+
+      '<h1>The First Paycheck</h1>'+
+      '<p>You are a college student with your first real paycheck. Six quick decisions, each on a countdown. The pace is part of the point.</p>'+
+      '<p class="muted">You start with $1,000 in cash and $0 a month coming from assets. After each choice you roll a die, because a good decision can lose and a careless one can win. At the end you get a personal profile. Nothing you pick is shared with your name on it.</p>'+
+      '<div class="btn-row"><button class="btn" id="go">Start</button></div>'+
+    '</div>'+
+    '<button class="linkish" id="cls" hidden>Presenter: show class results</button>';
+  $("#go").onclick = function(){ S.i=0; showRound(); };
+  var c=$("#cls"); c.hidden = !db;
+  c.onclick = showClassScreen;
+}
+
+function showRound(){
+  S.screen="round";
+  var R = ROUNDS[S.i];
+  var h = ledgerHTML() + '<div class="card">'+stepsHTML(S.i+1)+
+    '<p class="label">Round '+(S.i+1)+' of '+ROUNDS.length+' · '+R.title+'</p>'+
+    '<p>'+R.setup+'</p>';
+  {
+    h += '<div class="timer"><div class="track"><div class="bar" id="tbar"></div></div><div class="t" id="ttxt">'+R.secs+'s</div></div>';
+  }
+  h += '<div class="opts">';
+  R.opts.forEach(function(o){
+    h += '<button class="opt" data-k="'+o.k+'"><span class="k">'+o.k+'</span><span>'+o.text+'</span></button>';
+  });
+  h += '</div></div>';
+  app.innerHTML = h;
+  var btns = app.querySelectorAll(".opt");
+  for(var b=0;b<btns.length;b++){
+    btns[b].onclick = (function(k){ return function(){ choose(k); }; })(btns[b].getAttribute("data-k"));
+  }
+  startTimer(R.secs);
+  window.scrollTo(0,0);
+}
+
+function startTimer(secs){
+  var t0 = performance.now(), total = secs*1000;
+  clearInterval(tmr);
+  tmr = setInterval(function(){
+    var left = Math.max(0, total-(performance.now()-t0));
+    var bar=$("#tbar"), txt=$("#ttxt");
+    if(!bar){ clearInterval(tmr); return; }
+    bar.style.width = (left/total*100)+"%";
+    txt.textContent = Math.ceil(left/1000)+"s";
+    if(left<=0){ clearInterval(tmr); choose("–"); }
+  }, 100);
+}
+
+function choose(k){
+  clearInterval(tmr);
+  var R = ROUNDS[S.i];
+  var opt = null;
+  if(k==="–") opt = R.timeout;
+  else R.opts.forEach(function(o){ if(o.k===k) opt=o; });
+  if(!opt) return;
+
+  var roll = 1+Math.floor(Math.random()*6);
+  var L = roll<=2 ? -1 : roll>=5 ? 1 : 0;
+  var matters = !!opt.sw;
+  var fx = {cash:opt.fx.cash, assets:opt.fx.assets, flow:opt.fx.flow};
+  if(matters){
+    ["cash","assets","flow"].forEach(function(f){ if(opt.sw[f]) fx[f] += opt.sw[f]*L; });
+  }
+  var text = typeof opt.out==="string" ? opt.out : (L>0?opt.out.good:L<0?opt.out.bad:opt.out.mid);
+
+  S.picks.push({r:S.i, k:opt.k, ob:opt.ob, short:opt.short, roll:roll, L:L, matters:matters, late:k==="–"});
+  var before = {cash:S.cash, assets:S.assets, flow:S.flow};
+  S.screen="result";
+
+  var luckWord = L>0 ? '<span class="luckword good">Lucky roll</span>' : L<0 ? '<span class="luckword bad">Unlucky roll</span>' : '<span class="luckword mid">Average roll</span>';
+  var luckNote = matters ? 'This choice depended on luck.' : 'Luck did not matter here. Nothing about this choice depended on the roll.';
+
+  var h = '<div id="ledwrap"></div>'+
+    '<div class="card">'+stepsHTML(S.i+1)+
+      '<p class="label">Round '+(S.i+1)+' · '+R.title+' · you chose '+opt.k+'</p>'+
+      '<div class="dierow"><div class="die rolling" id="die" aria-label="Die roll">?</div>'+
+        '<div><div id="lw" class="muted">Rolling…</div><div class="note" id="ln" hidden>'+luckNote+'</div></div></div>'+
+      '<div id="outbox" hidden>'+
+        '<p>'+text+'</p>'+
+        '<div class="deltas" id="deltas"></div>'+
+        '<p class="tag">This round was about Takeaway '+R.take+': '+TAKE[R.take]+'.</p>'+
+        '<div class="btn-row"><button class="btn" id="next">'+(S.i<ROUNDS.length-1?"Next round":"See my profile")+'</button></div>'+
+      '</div>'+
+    '</div>';
+  app.innerHTML = h;
+  $("#ledwrap").innerHTML = ledgerHTML();
+
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var die = $("#die"), spins = 0, spin;
+  function reveal(){
+    clearInterval(spin);
+    die.classList.remove("rolling");
+    die.textContent = roll;
+    $("#lw").innerHTML = luckWord;
+    $("#ln").hidden = false;
+    S.cash += fx.cash; S.assets += fx.assets; S.flow += fx.flow;
+    $("#ledwrap").innerHTML = ledgerHTML();
+    var d = "";
+    [["Cash",fx.cash,""],["Assets",fx.assets,""],["Cash flow",fx.flow,"/mo"]].forEach(function(x){
+      if(x[1]!==0) d += '<span class="chip'+cls(x[1])+'">'+x[0]+' '+signed(x[1])+x[2]+'</span>';
+    });
+    $("#deltas").innerHTML = d || '<span class="chip">Nothing changed</span>';
+    $("#outbox").hidden = false;
+    var nb = $("#next"), label = nb.textContent, left = 10, adv;
+    function go(){
+      clearInterval(adv);
+      if(S.screen!=="result") return;
+      if(S.i<ROUNDS.length-1){ S.i++; showRound(); } else { showProfile(); }
+    }
+    nb.onclick = go;
+    nb.textContent = label+" ("+left+")";
+    adv = setInterval(function(){
+      if(S.screen!=="result"){ clearInterval(adv); return; }
+      left--; nb.textContent = label+" ("+left+")";
+      if(left<=0) go();
+    }, 1000);
+  }
+  if(reduce){ reveal(); }
+  else {
+    spin = setInterval(function(){
+      die.textContent = 1+Math.floor(Math.random()*6);
+      spins++;
+      if(spins>=5){ reveal(); }
+    }, 100);
+  }
+}
+
+/* ---------- profile ---------- */
+function analyze(){
+  var counts = {}, first = {};
+  S.picks.forEach(function(p){
+    if(p.ob){ counts[p.ob]=(counts[p.ob]||0)+1; if(first[p.ob]===undefined) first[p.ob]=p.r; }
+  });
+  var list = Object.keys(counts).sort(function(a,b){ return (counts[b]-counts[a]) || (first[a]-first[b]); });
+  var clean = S.picks.filter(function(p){ return !p.ob && !p.late; }).length;
+  var late = S.picks.filter(function(p){ return p.late; }).length;
+  var luckSum = 0, mattered = 0;
+  S.picks.forEach(function(p){ if(p.matters){ luckSum += p.L; mattered++; } });
+  return {counts:counts, first:first, list:list, clean:clean, late:late, luckSum:luckSum, mattered:mattered};
+}
+function luckSentence(a){
+  if(!a.mattered) return "None of your choices depended on luck, so the dice did not change your result.";
+  if(a.luckSum>0) return "Luck helped you: the dice went your way on choices that depended on them.";
+  if(a.luckSum<0) return "Luck worked against you: the dice went badly on choices that depended on them.";
+  return "Luck was about even on the choices that depended on it.";
+}
+function reportText(a){
+  var lines = [];
+  lines.push("THE FIRST PAYCHECK: MY PROFILE");
+  lines.push("Rich Dad Poor Dad training activity");
+  lines.push("");
+  lines.push("Final cash: "+money(S.cash));
+  lines.push("Assets: "+money(S.assets));
+  lines.push("Cash flow: "+signed(S.flow)+"/mo");
+  lines.push("Net worth (cash + assets): "+money(S.cash+S.assets));
+  lines.push("");
+  lines.push("Decisions with a process: "+a.clean+" of "+ROUNDS.length+". "+(a.late?"I ran out the clock on "+a.late+". ":"")+luckSentence(a));
+  lines.push("");
+  if(!a.list.length){
+    lines.push("No obstacle showed up in my choices this time.");
+  } else {
+    lines.push("WHAT SHOWED UP");
+    a.list.forEach(function(key){
+      var o = OB[key];
+      var ps = S.picks.filter(function(p){ return p.ob===key; });
+      lines.push("- "+o.name+": in "+ps.map(function(p){ return "round "+(p.r+1)+" I "+p.short; }).join("; and in ")+".");
+      lines.push("  Takeaway "+o.take+": "+TAKE[o.take]);
+      lines.push("  My 30-day action: "+o.act);
+    });
+  }
+  lines.push("");
+  lines.push("Six choices are a small sample. This shows a tendency in one exercise, not who I am.");
+  return lines.join("\n");
+}
+
+function showProfile(){
+  S.screen="profile";
+  var a = analyze();
+  var h = ledgerHTML() + '<div class="slip">'+
+    '<p class="label">Your profile</p>'+
+    '<h2>'+(a.list.length ? 'Here is what showed up' : 'No obstacle showed up')+'</h2>'+
+    '<p><span class="num">'+money(S.cash+S.assets)+'</span> net worth, <span class="num">'+signed(S.flow)+'/mo</span> in cash flow.</p>'+
+    '<p class="muted">'+a.clean+' of your '+ROUNDS.length+' decisions followed a process. '+luckSentence(a)+'</p>'+(a.late?'<p class="muted">The clock ran out on '+a.late+' of your decisions. Under pressure, not deciding is still a decision.</p>':'');
+  if(!a.list.length){
+    h += '<div class="found"><p>'+(a.late ? 'Nothing you chose showed an obstacle, but time ran out on some decisions. A quick checklist helps when the clock is short: what does it pay, what does it cost, and who gains if I say yes?' : 'You asked for the numbers, paid yourself first, and gave time to something you own. Good process can still lose to bad luck, so keep doing it when the dice are unkind.')+'</p></div>';
+  } else {
+    a.list.forEach(function(key){
+      var o = OB[key];
+      var ps = S.picks.filter(function(p){ return p.ob===key; });
+      var what = ps.map(function(p){ return 'In round '+(p.r+1)+' you '+p.short; }).join('. In ');
+      h += '<div class="found"><h3>'+o.name+'</h3>'+
+        '<p>'+what+'.</p>'+
+        '<p class="muted">Answered by Takeaway '+o.take+': '+TAKE[o.take]+'.</p>'+
+        '<p class="act"><strong>30-day action:</strong> '+o.act+'</p></div>';
+    });
+  }
+  h += '<p class="note">Six choices are a small sample. This shows a tendency in one exercise, not who you are.</p>'+
+    '<div class="btn-row">'+
+      '<button class="btn" id="save" hidden>Save my profile</button>'+
+      '<button class="btn ghost" id="copy">Copy as text</button>'+
+      '<button class="btn ghost" id="again">Play again</button>'+
+    '</div><p class="note" id="msg" hidden></p></div>'+
+    '<div class="card" id="classbox" hidden></div>';
+  app.innerHTML = h;
+  window.scrollTo(0,0);
+
+  var msg = $("#msg");
+  function say(t){ msg.textContent=t; msg.hidden=false; }
+  if(downloads){ $("#save").hidden=false; }
+  $("#save").onclick = function(){
+    downloads.save({filename:"my-first-paycheck-profile.txt", data:reportText(a)}).then(function(){ say("Saved."); }, function(e){ if(!e||e.code!=="declined") say("Saving is not available here. Use Copy as text."); });
+  };
+  $("#copy").onclick = function(){
+    var t = reportText(a);
+    function fallback(){
+      var ta = document.createElement("textarea"); ta.value=t; ta.style.cssText="width:100%;height:12em;margin-top:8px";
+      msg.hidden=false; msg.textContent="Select and copy this text:"; msg.appendChild(ta); ta.focus(); ta.select();
+    }
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(t).then(function(){ say("Copied."); }, fallback);
+    } else fallback();
+  };
+  $("#again").onclick = function(){ resetState(); showIntro(); };
+
+  renderClass();
+  submitRun(a);
+}
+
+/* ---------- class view (needs the shared store; the page works without it) ---------- */
+function submitRun(a){
+  if(wrote || !db || !uid) return;
+  wrote = true;
+  var doc = {n:1, clean:a.clean, late:a.late, t:Date.now()};
+  OB_KEYS.forEach(function(k){ doc[k] = a.counts[k]||0; });
+  var go = function(){
+    db.doc("runs/"+uid).set(doc).then(function(){}, function(){});
+  };
+  if(userNs && userNs.can){
+    userNs.can("data.write").then(function(ok){ if(ok!==false) go(); }, go);
+  } else go();
+}
+
+function classHTML(){
+  var n = classDocs.length;
+  var h = '<h3>What the class did</h3><p class="note">Anonymous totals. Each bar is the number of students whose choices showed that obstacle at least once.</p><div class="bars">';
+  var rows = OB_KEYS.map(function(k){
+    var c = classDocs.filter(function(d){ return (d[k]||0)>0; }).length;
+    return {k:k, c:c};
+  }).sort(function(x,y){ return y.c-x.c; });
+  rows.forEach(function(r){
+    var pct = n ? Math.round(r.c/n*100) : 0;
+    h += '<div class="bar-row"><div class="name">'+OB[r.k].name+'</div><div class="ct">'+r.c+' of '+n+'</div>'+
+         '<div class="rail"><div class="fill" style="width:'+pct+'%"></div></div></div>';
+  });
+  var cleanAll = classDocs.filter(function(d){ return (d.clean||0)===ROUNDS.length; }).length;
+  h += '</div><p class="note">'+n+' student'+(n===1?'':'s')+' finished. '+cleanAll+' made all six decisions with a process.</p>';
+  return h;
+}
+function renderClass(){
+  var box = $("#classbox");
+  if(box){
+    if(db && classDocs.length){ box.innerHTML = classHTML(); box.hidden=false; } else box.hidden = true;
+  }
+  var cs = $("#classscreen");
+  if(cs){ cs.innerHTML = db ? (classDocs.length ? classHTML() : '<p class="muted">No finished runs yet. Results appear here as students reach their profile.</p>') : '<p class="muted">The shared class view is not available for this link.</p>'; }
+}
+function showClassScreen(){
+  S.screen="class";
+  app.innerHTML = '<div class="card"><p class="label">Presenter view</p><div id="classscreen"></div>'+
+    '<div class="btn-row"><button class="btn ghost" id="back">Back</button></div></div>';
+  $("#back").onclick = showIntro;
+  renderClass();
+}
+
+/* ---------- optional capabilities ---------- */
+(function init(){
+  var c = window.claude;
+  if(!c || !c.use) return;
+  c.use("downloads").then(function(d){ downloads = d; if(S.screen==="profile"){ var s=$("#save"); if(s) s.hidden=!d; } }, function(){});
+  Promise.all([c.use("db"), c.use("user")]).then(function(r){
+    db = r[0]; userNs = r[1];
+    if(!db) return;
+    if(userNs && userNs.id){ userNs.id().then(function(id){ uid = id; }, function(){}); }
+    var intro = $("#cls"); if(intro) intro.hidden = false;
+    db.collection("runs").onSnapshot(function(snap){
+      classDocs = snap.docs.map(function(d){ return d.data(); });
+      renderClass();
+    }, function(){});
+  }, function(){});
+})();
+
+showIntro();
+})();
+</script>
+
+</body>
+</html>
